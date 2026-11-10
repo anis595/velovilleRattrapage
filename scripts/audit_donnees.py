@@ -2,6 +2,7 @@ import pandas as pd
 
 STATIONS = pd.read_csv("./data/stations.csv")
 TRAJETS = pd.read_csv("./data/trajets.csv")
+INCIDENTS = pd.read_csv("./data/incidents.csv")
 
 
 #                  STATIONS
@@ -54,3 +55,85 @@ horodatage = pd.to_datetime(
     TRAJETS["depart_horodatage"], format="%Y-%m-%d %H:%M:%S", errors="coerce"
 )
 print(horodatage.isna().sum())
+
+print(TRAJETS[horodatage.isna()])
+
+print(TRAJETS["type_usager"].value_counts(dropna=False))
+
+print(((TRAJETS["type_usager"] == "abonne") & (TRAJETS["usager_ref"].isna())).sum())
+print(
+    ((TRAJETS["type_usager"] == "occasionnel") & (TRAJETS["usager_ref"].notna())).sum()
+)
+velos_valides = TRAJETS["velo_id"].str.fullmatch("V[0-9]{4}", na=False)
+print(TRAJETS[~velos_valides])
+
+print(TRAJETS["usager_ref"].dropna().str.fullmatch("U[0-9a-fA-F]{8}").value_counts())
+
+#                  INCIDENTS
+
+print(INCIDENTS.duplicated().sum())
+print(INCIDENTS["statut"].value_counts(dropna=False))
+print(INCIDENTS["cible"].value_counts(dropna=False))
+
+station_incident_invalide = (INCIDENTS["cible"] == "station") & ~(
+    INCIDENTS["station_id"].isin(STATIONS["station_id"])
+)
+
+print(INCIDENTS[station_incident_invalide])
+
+cibles_valides = (
+    (INCIDENTS["cible"] == "velo")
+    & INCIDENTS["velo_id"].notna()
+    & INCIDENTS["station_id"].isna()
+) | (
+    (INCIDENTS["cible"] == "station")
+    & INCIDENTS["station_id"].notna()
+    & INCIDENTS["velo_id"].isna()
+)
+
+print("Incidents avec une cible incohérente :", (~cibles_valides).sum())
+print(INCIDENTS[~cibles_valides])
+
+signalement = pd.to_datetime(
+    INCIDENTS["date_signalement"],
+    format="%Y-%m-%d %H:%M",
+    errors="coerce",
+)
+
+resolution = pd.to_datetime(
+    INCIDENTS["date_resolution"],
+    format="%Y-%m-%d %H:%M",
+    errors="coerce",
+)
+
+statuts = INCIDENTS["statut"].str.strip().str.lower().str.replace(" ", "_", regex=False)
+
+resolus = statuts.eq("resolu")
+resolution_renseignee = INCIDENTS["date_resolution"].notna()
+technicien_absent = INCIDENTS["technicien"].fillna("").str.strip().eq("")
+
+controles = {
+    "Signalement absent ou non convertible": signalement.isna(),
+    "Résolution renseignée mais non convertible": resolution_renseignee
+    & resolution.isna(),
+    "Incident résolu sans date de résolution": resolus & ~resolution_renseignee,
+    "Incident non résolu avec une date de résolution": ~resolus & resolution_renseignee,
+    "Résolution antérieure au signalement": resolution < signalement,
+    "Technicien absent après prise en charge — avertissement": statuts.isin(
+        ["en_cours", "resolu"]
+    )
+    & technicien_absent,
+}
+
+colonnes = [
+    "incident_id",
+    "statut",
+    "date_signalement",
+    "date_resolution",
+    "technicien",
+]
+
+for libelle, filtre in controles.items():
+    print(f"\n{libelle} : {filtre.sum()}")
+    if filtre.any():
+        print(INCIDENTS.loc[filtre, colonnes].to_string(index=False))
