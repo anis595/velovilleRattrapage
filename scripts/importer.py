@@ -11,8 +11,14 @@ Usage prévu : python scripts/importer.py [--dossier data]
 
 import csv
 from sqlalchemy import text
-from api.database import engine
+
 from datetime import datetime
+import sys
+from pathlib import Path
+
+RACINE_PROJET = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(RACINE_PROJET))
+from api.database import engine
 from api.services.fiabilisation import (
     valider_capacite,
     normaliser_identifiant_velo,
@@ -24,7 +30,15 @@ from api.services.fiabilisation import (
     convertir_horodatage_incident,
     valider_cible_incident,
     valider_dates_incident,
+    est_doublon_exact,
+    valider_identifiant_unique,
 )
+
+
+class ErreurPreparation(ValueError):
+    def __init__(self, colonne, motif):
+        super().__init__(motif)
+        self.colonne = colonne
 
 
 def lire_csv(chemin):
@@ -75,24 +89,36 @@ def preparer_station(ligne):
     station["nom"] = ligne["nom"]
     station["commune"] = ligne["commune"]
 
-    station["capacite"] = valider_capacite(ligne["capacite"])
+    try:
+        station["capacite"] = valider_capacite(ligne["capacite"])
+    except ValueError as erreur:
+        raise ErreurPreparation("capacite", str(erreur))
 
-    if ligne["latitude"] == "":
-        station["latitude"] = None
-    else:
-        station["latitude"] = float(ligne["latitude"])
+    try:
+        if ligne["latitude"] == "":
+            station["latitude"] = None
+        else:
+            station["latitude"] = float(ligne["latitude"])
+    except ValueError as erreur:
+        raise ErreurPreparation("latitude", str(erreur))
 
-    if ligne["longitude"] == "":
-        station["longitude"] = None
-    else:
-        station["longitude"] = float(ligne["longitude"])
+    try:
+        if ligne["longitude"] == "":
+            station["longitude"] = None
+        else:
+            station["longitude"] = float(ligne["longitude"])
+    except ValueError as erreur:
+        raise ErreurPreparation("longitude", str(erreur))
 
-    if ligne["date_mise_en_service"] == "":
-        station["date_mise_en_service"] = None
-    else:
-        station["date_mise_en_service"] = datetime.strptime(
-            ligne["date_mise_en_service"], "%Y-%m-%d"
-        ).date()
+    try:
+        if ligne["date_mise_en_service"] == "":
+            station["date_mise_en_service"] = None
+        else:
+            station["date_mise_en_service"] = datetime.strptime(
+                ligne["date_mise_en_service"], "%Y-%m-%d"
+            ).date()
+    except ValueError as erreur:
+        raise ErreurPreparation("date_mise_en_service", str(erreur))
 
     return station
 
@@ -104,23 +130,45 @@ def preparer_trajet(ligne, stations_connues):
 
     trajet["velo_id"] = normaliser_identifiant_velo(ligne["velo_id"])
 
-    trajet["depart_horodatage"] = normaliser_horodatage_trajet(
-        ligne["depart_horodatage"]
-    )
+    try:
+        trajet["depart_horodatage"] = normaliser_horodatage_trajet(
+            ligne["depart_horodatage"]
+        )
+    except ValueError as erreur:
+        raise ErreurPreparation("depart_horodatage", str(erreur))
 
-    trajet["station_depart"] = valider_station(
-        ligne["station_depart"], stations_connues
-    )
+    try:
+        trajet["station_depart"] = valider_station(
+            ligne["station_depart"], stations_connues
+        )
+    except ValueError as erreur:
+        raise ErreurPreparation("station_depart", str(erreur))
 
-    trajet["station_arrivee"] = valider_station(
-        ligne["station_arrivee"], stations_connues, obligatoire=False
-    )
+    try:
+        trajet["station_arrivee"] = valider_station(
+            ligne["station_arrivee"], stations_connues, obligatoire=False
+        )
+    except ValueError as erreur:
+        raise ErreurPreparation("station_arrivee", str(erreur))
 
-    trajet["duree_secondes"] = valider_duree(ligne["duree_secondes"])
+    try:
+        trajet["duree_secondes"] = valider_duree(ligne["duree_secondes"])
+    except ValueError as erreur:
+        raise ErreurPreparation("duree_secondes", str(erreur))
 
     trajet["type_usager"] = ligne["type_usager"]
 
-    trajet["usager_ref"] = valider_usager(ligne["type_usager"], ligne["usager_ref"])
+    # valider_usager vérifie deux colonnes :
+    # identifier celle qui explique un éventuel rejet.
+    if ligne["type_usager"] not in ("abonne", "occasionnel"):
+        colonne_usager = "type_usager"
+    else:
+        colonne_usager = "usager_ref"
+
+    try:
+        trajet["usager_ref"] = valider_usager(ligne["type_usager"], ligne["usager_ref"])
+    except ValueError as erreur:
+        raise ErreurPreparation(colonne_usager, str(erreur))
 
     return trajet
 
@@ -229,8 +277,72 @@ def recuperer_stations_connues(connexion):
     return stations_connues
 
 
+def importer_stations(connexion, lignes, journal):
+    lignes_deja_vues = []
+    identifiants_deja_vus = []
+    nb_valides = 0
+    nb_rejets = 0
+    nb_doublons = 0
+
+    for ligne in lignes:
+        if est_doublon_exact(ligne, lignes_deja_vues):
+            nb_doublons += 1
+            continue
+
+        identifiant = ligne["station_id"]
+        lignes_deja_vues.append(ligne)
+
+        try:
+            valider_identifiant_unique(identifiant, identifiants_deja_vus)
+
+        except ValueError as erreur:
+            ajouter_entree_journal(
+                journal,
+                "stations.csv",
+                identifiant,
+                "station_id",
+                identifiant,
+                str(erreur),
+                "rejet",
+            )
+            nb_rejets += 1
+            continue
+        identifiants_deja_vus.append(identifiant)
+
+        try:
+            station = preparer_station(ligne)
+
+        except ErreurPreparation as erreur:
+            ajouter_entree_journal(
+                journal,
+                "stations.csv",
+                identifiant,
+                erreur.colonne,
+                ligne[erreur.colonne],
+                str(erreur),
+                "rejet",
+            )
+            nb_rejets += 1
+            continue
+        inserer_station(connexion, station)
+        nb_valides += 1
+    return {"valides": nb_valides, "rejets": nb_rejets, "doublons": nb_doublons}
+
+
 def main() -> None:
-    raise NotImplementedError("À compléter")
+    journal = []
+    lignes_stations = lire_csv("data/stations.csv")
+    # Lire data/stations.csv avec lire_csv
+    # Conserver le résultat dans lignes_stations
+
+    with engine.begin() as connexion:
+        bilan_stations = importer_stations(connexion, lignes_stations, journal)
+
+    print("Stations :", bilan_stations)
+    ecrire_journal(journal, "docs/journal-import.csv")
+
+    # Écrire le journal avec ecrire_journal
+    # au chemin "docs/journal-import.csv"
 
 
 if __name__ == "__main__":
