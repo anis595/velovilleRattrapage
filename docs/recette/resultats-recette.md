@@ -16,3 +16,5 @@
 Première passe : 10 cas exécutés, 8 OK, 2 KO, 0 NT. Anomalies relevées avant correction : REC-02 (doublons absents du journal), REC-10 (trace sans jeton, description technique affichée).
 
 Rejeu après correction d'ANO-001 : REC-02 OK le 17/11/2026. L'import affiche 2002 trajets valides, 16 rejets et 12 doublons ; le journal contient désormais 16 rejets invalides et 12 doublons exacts. Trois tests de non-régression passent dans `tests/unit/test_importer.py`.
+
+Rejeu ciblé après correction d'ANO-002 : la déconnexion et les liens « Page de connexion » des pages Stations, Incidents et Indicateurs fonctionnent sans trace, confirmation utilisateur le 17/11/2026. REC-10 reste KO tant que l'affichage des descriptions techniques (ANO-003) n'est pas corrigé.

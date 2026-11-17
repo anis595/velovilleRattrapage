@@ -16,7 +16,7 @@ st.title("Incidents")
 jeton = st.session_state.get("token")
 if not jeton:
     st.info("Veuillez vous connecter.")
-    st.page_link("front/app.py", label="Page de connexion")
+    st.page_link("app.py", label="Page de connexion")
     st.stop()
 
 st.sidebar.write(f"Connecté : {st.session_state['username']}")
@@ -24,7 +24,7 @@ st.sidebar.write(f"Rôle : {st.session_state['role']}")
 if st.sidebar.button("Se déconnecter"):
     for cle in ("token", "role", "username"):
         st.session_state.pop(cle, None)
-    st.switch_page("front/app.py")
+    st.switch_page("app.py")
 
 message = st.session_state.pop("incident_message", None)
 if message:
