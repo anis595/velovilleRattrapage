@@ -10,28 +10,29 @@ Usage prévu : python scripts/importer.py [--dossier data]
 """
 
 import csv
-from sqlalchemy import text
-
-from datetime import datetime
 import sys
+from datetime import datetime
 from pathlib import Path
+
+from sqlalchemy import text
 
 RACINE_PROJET = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RACINE_PROJET))
 from api.database import engine
 from api.services.fiabilisation import (
-    valider_capacite,
-    normaliser_identifiant_velo,
-    normaliser_horodatage_trajet,
-    valider_station,
-    valider_duree,
-    valider_usager,
-    normalise_statut,
     convertir_horodatage_incident,
+    est_doublon_exact,
+    normalise_statut,
+    normaliser_horodatage_trajet,
+    normaliser_identifiant_velo,
+    valider_capacite,
     valider_cible_incident,
     valider_dates_incident,
-    est_doublon_exact,
+    valider_duree,
     valider_identifiant_unique,
+    valider_station,
+    valider_usager,
+    avertissement_technicien
 )
 
 
@@ -179,7 +180,10 @@ def preparer_incident(ligne, stations_connues):
     incident["incident_id"] = ligne["incident_id"]
     incident["type_incident"] = ligne["type_incident"]
 
-    incident["statut"] = normalise_statut(ligne["statut"])
+    try:
+        incident["statut"] = normalise_statut(ligne["statut"])
+    except ValueError as erreur:
+        raise ErreurPreparation("statut", str(erreur)) from erreur
 
     if ligne["velo_id"] == "":
         incident["velo_id"] = None
@@ -191,19 +195,64 @@ def preparer_incident(ligne, stations_connues):
     else:
         incident["station_id"] = ligne["station_id"]
 
-    incident["cible"] = valider_cible_incident(
-        ligne["cible"], incident["velo_id"], incident["station_id"], stations_connues
-    )
+    try:
+        incident["cible"] = valider_cible_incident(
+            ligne["cible"],
+            incident["velo_id"],
+            incident["station_id"],
+            stations_connues,
+        )
+    except ValueError as erreur:
+        motif = str(erreur)
 
-    incident["date_signalement"] = convertir_horodatage_incident(
-        ligne["date_signalement"]
-    )
+        if motif == "Identifiant vélo obligatoire":
+            colonne = "velo_id"
+        elif motif == "Une cible vélo ne doit pas avoir de station":
+            colonne = "station_id"
+        elif motif in (
+            "Une cible station ne doit pas avoir de vélo",
+        ):
+            colonne = "velo_id"
+        elif motif in ("Station obligatoire absente", "Station inconnue"):
+            colonne = "station_id"
+        else:
+            colonne = "cible"
 
-    date_resolution = convertir_horodatage_incident(ligne["date_resolution"])
+        raise ErreurPreparation(colonne, motif) from erreur
 
-    incident["date_resolution"] = valider_dates_incident(
-        incident["statut"], incident["date_signalement"], date_resolution
-    )
+    try:
+        incident["date_signalement"] = convertir_horodatage_incident(
+            ligne["date_signalement"]
+        )
+    except ValueError as erreur:
+        raise ErreurPreparation(
+            "date_signalement", str(erreur)
+        ) from erreur
+
+    try:
+        date_resolution = convertir_horodatage_incident(
+            ligne["date_resolution"]
+        )
+    except ValueError as erreur:
+        raise ErreurPreparation(
+            "date_resolution", str(erreur)
+        ) from erreur
+
+    try:
+        incident["date_resolution"] = valider_dates_incident(
+            incident["statut"],
+            incident["date_signalement"],
+            date_resolution,
+        )
+    except ValueError as erreur:
+        motif = str(erreur)
+
+        if motif == "Date de signalement obligatoire":
+            colonne = "date_signalement"
+        else:
+            colonne = "date_resolution"
+
+        raise ErreurPreparation(colonne, motif) from erreur
 
     if ligne["technicien"] == "":
         incident["technicien"] = None
@@ -329,21 +378,180 @@ def importer_stations(connexion, lignes, journal):
     return {"valides": nb_valides, "rejets": nb_rejets, "doublons": nb_doublons}
 
 
+
+def importer_trajets(connexion, lignes, stations_connues, journal):
+    lignes_deja_vues = []
+    identifiants_deja_vus = []
+    nb_valides = 0
+    nb_rejets = 0
+    nb_doublons = 0
+
+    for ligne in lignes:
+        if est_doublon_exact(ligne, lignes_deja_vues):
+            nb_doublons += 1
+            continue
+
+        identifiant = ligne["trajet_id"]
+        lignes_deja_vues.append(ligne)
+
+        try:
+            valider_identifiant_unique(identifiant, identifiants_deja_vus)
+        except ValueError as erreur:
+            ajouter_entree_journal(
+                journal,
+                "trajets.csv",
+                identifiant,
+                "trajet_id",
+                identifiant,
+                str(erreur),
+                "rejet",
+            )
+            nb_rejets += 1
+            continue
+
+        identifiants_deja_vus.append(identifiant)
+
+        try:
+            trajet = preparer_trajet(ligne, stations_connues)
+        except ErreurPreparation as erreur:
+            ajouter_entree_journal(
+                journal,
+                "trajets.csv",
+                identifiant,
+                erreur.colonne,
+                ligne[erreur.colonne],
+                str(erreur),
+                "rejet",
+            )
+            nb_rejets += 1
+            continue
+
+        inserer_trajet(connexion, trajet)
+
+        if ligne["velo_id"] != trajet["velo_id"]:
+            ajouter_entree_journal(
+                journal,
+                "trajets.csv",
+                identifiant,
+                "velo_id",
+                ligne["velo_id"],
+                "Identifiant du vélo normalisé en majuscules",
+                "normalisation",
+            )
+
+        horodatage_normalise = trajet["depart_horodatage"].strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
+        if ligne["depart_horodatage"] != horodatage_normalise:
+            ajouter_entree_journal(
+                journal,
+                "trajets.csv",
+                identifiant,
+                "depart_horodatage",
+                ligne["depart_horodatage"],
+                "Horodatage normalisé",
+                "normalisation",
+            )
+
+        nb_valides += 1
+
+    return {
+        "valides": nb_valides,
+        "rejets": nb_rejets,
+        "doublons": nb_doublons,
+    }
+
+def importer_incidents(connexion, lignes, stations_connues, journal):
+    lignes_deja_vues = []
+    identifiants_deja_vus = []
+    nb_valides = 0
+    nb_rejets = 0
+    nb_doublons = 0
+
+    for ligne in lignes:
+        if est_doublon_exact(ligne, lignes_deja_vues):
+            nb_doublons += 1
+            continue
+
+        identifiant = ligne["incident_id"]
+        lignes_deja_vues.append(ligne)
+
+        try:
+            valider_identifiant_unique(identifiant, identifiants_deja_vus)
+        except ValueError as erreur:
+            ajouter_entree_journal(
+                journal, "incidents.csv", identifiant,
+                "incident_id", identifiant, str(erreur), "rejet",
+            )
+            nb_rejets += 1
+            continue
+
+        identifiants_deja_vus.append(identifiant)
+
+        try:
+            incident = preparer_incident(ligne, stations_connues)
+        except ErreurPreparation as erreur:
+            ajouter_entree_journal(
+                journal, "incidents.csv", identifiant,
+                erreur.colonne, ligne[erreur.colonne],
+                str(erreur), "rejet",
+            )
+            nb_rejets += 1
+            continue
+
+        inserer_incident(connexion, incident)
+
+        if ligne["statut"] != incident["statut"]:
+            ajouter_entree_journal(
+                journal, "incidents.csv", identifiant,
+                "statut", ligne["statut"],
+                "Statut normalisé", "normalisation",
+            )
+
+        if incident["velo_id"] is not None and ligne["velo_id"] != incident["velo_id"]:
+            ajouter_entree_journal(
+                journal, "incidents.csv", identifiant,
+                "velo_id", ligne["velo_id"],
+                "Identifiant du vélo normalisé en majuscules",
+                "normalisation",
+            )
+
+        avertissement = avertissement_technicien(
+            incident["statut"], incident["technicien"]
+        )
+        if avertissement is not None:
+            ajouter_entree_journal(
+                journal, "incidents.csv", identifiant,
+                "technicien", ligne["technicien"],
+                avertissement, "avertissement",
+            )
+
+        nb_valides += 1
+
+    return {
+        "valides": nb_valides,
+        "rejets": nb_rejets,
+        "doublons": nb_doublons,
+    }
 def main() -> None:
     journal = []
     lignes_stations = lire_csv("data/stations.csv")
-    # Lire data/stations.csv avec lire_csv
-    # Conserver le résultat dans lignes_stations
+    lignes_trajets = lire_csv("data/trajets.csv")
+    lignes_incidents = lire_csv("data/incidents.csv")
 
     with engine.begin() as connexion:
         bilan_stations = importer_stations(connexion, lignes_stations, journal)
+        stations_connues = recuperer_stations_connues(connexion)
+        bilan_trajets = importer_trajets(
+            connexion, lignes_trajets, stations_connues, journal
+        )
+        bilan_incidents = importer_incidents(
+            connexion, lignes_incidents, stations_connues, journal
+        )
 
     print("Stations :", bilan_stations)
+    print("Trajets :", bilan_trajets)
+    print("Incidents :", bilan_incidents)
     ecrire_journal(journal, "docs/journal-import.csv")
-
-    # Écrire le journal avec ecrire_journal
-    # au chemin "docs/journal-import.csv"
-
-
 if __name__ == "__main__":
     main()
