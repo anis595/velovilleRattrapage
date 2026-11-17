@@ -1,29 +1,41 @@
 fichier_source,identifiant,colonne,valeur,motif,decision
 trajets.csv,T480030,station_arrivee,S999,Station inconnue,rejet
 trajets.csv,T480034,station_arrivee,S999,Station inconnue,rejet
+trajets.csv,T480073,trajet_id,T480073,Doublon exact écarté,rejet
+trajets.csv,T480078,trajet_id,T480078,Doublon exact écarté,rejet
 trajets.csv,T480086,velo_id,v1281,Identifiant du vélo normalisé en majuscules,normalisation
 trajets.csv,T480152,station_arrivee,S999,Station inconnue,rejet
 trajets.csv,T480235,station_arrivee,S999,Station inconnue,rejet
+trajets.csv,T480288,trajet_id,T480288,Doublon exact écarté,rejet
+trajets.csv,T480293,trajet_id,T480293,Doublon exact écarté,rejet
 trajets.csv,T480379,depart_horodatage,25/08/2026 17:08,Horodatage normalisé,normalisation
 trajets.csv,T480596,duree_secondes,-120,La durée doit être strictement positive,rejet
+trajets.csv,T480596,trajet_id,T480596,Doublon exact écarté,rejet
 trajets.csv,T480605,velo_id,v0685,Identifiant du vélo normalisé en majuscules,normalisation
 trajets.csv,T480712,duree_secondes,-45,La durée doit être strictement positive,rejet
+trajets.csv,T480847,trajet_id,T480847,Doublon exact écarté,rejet
 trajets.csv,T480858,station_arrivee,S999,Station inconnue,rejet
 trajets.csv,T480899,duree_secondes,-45,La durée doit être strictement positive,rejet
 trajets.csv,T480924,duree_secondes,-120,La durée doit être strictement positive,rejet
 trajets.csv,T480929,velo_id,v0800,Identifiant du vélo normalisé en majuscules,normalisation
+trajets.csv,T480945,trajet_id,T480945,Doublon exact écarté,rejet
 trajets.csv,T481067,duree_secondes,0,La durée doit être strictement positive,rejet
 trajets.csv,T481074,duree_secondes,0,La durée doit être strictement positive,rejet
 trajets.csv,T481274,duree_secondes,0,La durée doit être strictement positive,rejet
 trajets.csv,T481359,velo_id,v0959,Identifiant du vélo normalisé en majuscules,normalisation
 trajets.csv,T481464,station_arrivee,S999,Station inconnue,rejet
 trajets.csv,T481592,depart_horodatage,29/08/2026 12:59,Horodatage normalisé,normalisation
+trajets.csv,T481625,trajet_id,T481625,Doublon exact écarté,rejet
+trajets.csv,T481636,trajet_id,T481636,Doublon exact écarté,rejet
 trajets.csv,T481685,velo_id,v1788,Identifiant du vélo normalisé en majuscules,normalisation
 trajets.csv,T481688,duree_secondes,-120,La durée doit être strictement positive,rejet
 trajets.csv,T481717,station_arrivee,S999,Station inconnue,rejet
+trajets.csv,T481776,trajet_id,T481776,Doublon exact écarté,rejet
+trajets.csv,T481834,trajet_id,T481834,Doublon exact écarté,rejet
 trajets.csv,T481846,duree_secondes,-45,La durée doit être strictement positive,rejet
 trajets.csv,T481885,depart_horodatage,30/08/2026 07:22,Horodatage normalisé,normalisation
 trajets.csv,T481907,velo_id,v0936,Identifiant du vélo normalisé en majuscules,normalisation
+trajets.csv,T481927,trajet_id,T481927,Doublon exact écarté,rejet
 trajets.csv,T481958,depart_horodatage,30/08/2026 15:22,Horodatage normalisé,normalisation
 incidents.csv,I2026-0001,statut,En cours,Statut normalisé,normalisation
 incidents.csv,I2026-0003,statut,RESOLU,Statut normalisé,normalisation

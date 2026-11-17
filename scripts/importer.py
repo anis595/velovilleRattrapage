@@ -335,6 +335,11 @@ def importer_stations(connexion, lignes, journal):
 
     for ligne in lignes:
         if est_doublon_exact(ligne, lignes_deja_vues):
+            ajouter_entree_journal(
+                journal, "stations.csv", ligne["station_id"],
+                "station_id", ligne["station_id"],
+                "Doublon exact écarté", "rejet",
+            )
             nb_doublons += 1
             continue
 
@@ -388,6 +393,11 @@ def importer_trajets(connexion, lignes, stations_connues, journal):
 
     for ligne in lignes:
         if est_doublon_exact(ligne, lignes_deja_vues):
+            ajouter_entree_journal(
+                journal, "trajets.csv", ligne["trajet_id"],
+                "trajet_id", ligne["trajet_id"],
+                "Doublon exact écarté", "rejet",
+            )
             nb_doublons += 1
             continue
 
@@ -470,6 +480,11 @@ def importer_incidents(connexion, lignes, stations_connues, journal):
 
     for ligne in lignes:
         if est_doublon_exact(ligne, lignes_deja_vues):
+            ajouter_entree_journal(
+                journal, "incidents.csv", ligne["incident_id"],
+                "incident_id", ligne["incident_id"],
+                "Doublon exact écarté", "rejet",
+            )
             nb_doublons += 1
             continue
 
