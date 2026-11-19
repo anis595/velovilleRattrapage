@@ -1,9 +1,3 @@
-"""Écran Stations.
-
-À compléter : tableau des stations filtrable par commune, pagination.
-"""
-"""Liste filtrable et paginée des stations."""
-
 import math
 
 import streamlit as st

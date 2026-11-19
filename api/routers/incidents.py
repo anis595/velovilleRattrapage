@@ -1,8 +1,3 @@
-"""Routeur incidents.
-
-À compléter : GET /incidents (filtre statut, pagination) et
-PUT /incidents/{incident_id}/statut (rôle exploitant).
-"""
 """Routes de lecture et de changement de statut des incidents."""
 
 from fastapi import APIRouter, Depends, HTTPException, Query

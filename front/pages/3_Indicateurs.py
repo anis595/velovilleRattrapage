@@ -1,10 +1,3 @@
-"""Écran Indicateurs.
-
-À compléter : trois st.metric et trois tableaux issus des trois endpoints
-/indicateurs. Aucun graphique.
-"""
-"""Restitution tabulaire des trois indicateurs."""
-
 from datetime import date
 
 import streamlit as st
