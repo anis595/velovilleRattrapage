@@ -1,7 +1,3 @@
-"""Routeur trajets.
-
-À compléter : GET /trajets (filtres date_debut, date_fin, station ; pagination).
-"""
 """Route de lecture des trajets."""
 
 from datetime import date

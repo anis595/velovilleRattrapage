@@ -1,7 +1,3 @@
-"""Routeur stations.
-
-À compléter : GET /stations (filtre commune, pagination) et GET /stations/{station_id}.
-"""
 """Routes de lecture des stations."""
 
 from fastapi import APIRouter, Depends, HTTPException, Query

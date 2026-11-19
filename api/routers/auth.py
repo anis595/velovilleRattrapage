@@ -1,7 +1,3 @@
-"""Routeur auth.
-
-À compléter : POST /auth/login.
-"""
 """Route de connexion à l’API VéloVille."""
 
 from fastapi import APIRouter, Depends, HTTPException

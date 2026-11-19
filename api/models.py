@@ -1,7 +1,3 @@
-"""Modèles ORM SQLAlchemy : Station, Trajet, Incident, Utilisateur.
-
-À compléter : déclarer les quatre tables conformément à sql/schema.sql.
-"""
 """Modèles des quatre tables de VéloVille."""
 
 from datetime import date, datetime

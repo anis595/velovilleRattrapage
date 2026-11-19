@@ -1,16 +1,8 @@
-"""Client HTTP centralisé vers l'API VéloVille.
-
-À compléter : lire API_URL et API_TIMEOUT_SECONDES, ajouter l'en-tête
-Authorization: Bearer <jeton>, lever ErreurApi (message en français)
-sur erreur réseau, délai dépassé ou code HTTP d'erreur.
-"""
-
-
 """Client HTTP commun aux écrans Streamlit."""
 
 import os
 
-import httpx
+import requests
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -30,7 +22,7 @@ def appeler_api(methode, chemin, jeton=None, params=None, donnees=None):
         entetes["Authorization"] = f"Bearer {jeton}"
 
     try:
-        reponse = httpx.request(
+        reponse = requests.request(
             methode,
             f"{API_URL}{chemin}",
             headers=entetes,
@@ -38,7 +30,7 @@ def appeler_api(methode, chemin, jeton=None, params=None, donnees=None):
             json=donnees,
             timeout=API_TIMEOUT_SECONDES,
         )
-    except httpx.RequestError as erreur:
+    except requests.exceptions.RequestException as erreur:
         raise ErreurApi(
             "L'API est injoignable. Vérifiez qu'elle est démarrée."
         ) from erreur
@@ -61,7 +53,7 @@ def appeler_api(methode, chemin, jeton=None, params=None, donnees=None):
             raise ErreurApi("Transition de statut non autorisée.")
         raise ErreurApi("Paramètres invalides.")
 
-    if reponse.is_error:
+    if not reponse.ok:
         raise ErreurApi("Une erreur est survenue dans l'API.")
 
     return reponse.json()

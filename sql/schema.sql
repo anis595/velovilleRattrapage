@@ -1,7 +1,5 @@
 -- Schéma de la base veloville (PostgreSQL 14+).
--- À compléter en respectant le contrat du sujet (types, clés, contraintes).
--- Le script doit être rejouable : prévoir les DROP ... IF EXISTS ou
--- CREATE TABLE IF NOT EXISTS.
+-- Création rejouable des tables et de leurs contraintes.
 
 -- ---------------------------------------------------------------
 -- 1. Table station
